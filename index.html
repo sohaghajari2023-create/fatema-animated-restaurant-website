@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scroll Animation</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+        }
+        
+        /* The container determines how long we can scroll. */
+        body {
+            height: 400vh;
+        }
+        
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            image-rendering: high-quality;
+            z-index: -1;
+        }
+        
+        /* Optional: smooth hiding scrollbar for aesthetic purposes */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2); 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5); 
+        }
+    </style>
+</head>
+<body>
+    <canvas id="video-canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("video-canvas");
+        const context = canvas.getContext("2d");
+
+        const frameCount = 239;
+        const currentFrame = index => (
+            `./video_frames_30fps_jpg/frame_${(index + 1).toString().padStart(4, '0')}.jpg`
+        );
+
+        const images = [];
+        
+        // Preload images
+        for (let i = 0; i < frameCount; i++) {
+            const img = new Image();
+            img.src = currentFrame(i);
+            images.push(img);
+        }
+
+        // Wait for first image to load to set canvas size and draw initial frame
+        images[0].onload = () => {
+            canvas.width = images[0].naturalWidth;
+            canvas.height = images[0].naturalHeight;
+            render(0);
+        };
+
+        function render(index) {
+            if (images[index] && images[index].complete) {
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(images[index], 0, 0, canvas.width, canvas.height);
+            } else if (images[index]) {
+                // If the user scrolls too fast and image isn't loaded yet, draw it when it loads
+                images[index].onload = () => {
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(images[index], 0, 0, canvas.width, canvas.height);
+                };
+            }
+        }
+
+        let ticking = false;
+        
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const scrollTop = document.documentElement.scrollTop;
+                    const maxScrollTop = document.documentElement.scrollHeight - window.innerHeight;
+                    
+                    let scrollFraction = 0;
+                    if (maxScrollTop > 0) {
+                        scrollFraction = scrollTop / maxScrollTop;
+                    }
+                    
+                    const frameIndex = Math.min(
+                        frameCount - 1,
+                        Math.max(0, Math.floor(scrollFraction * frameCount))
+                    );
+                    
+                    render(frameIndex);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+    </script>
+</body>
+</html>

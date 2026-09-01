@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold: #c2964b;
+  --color-bg: #111111;
+  --color-card: #1a1a1a;
+  
+  --font-bengali: "Hind Siliguri", sans-serif;
+}
+
+body {
+  font-family: var(--font-bengali);
+  background-color: transparent;
+  color: white;
+}

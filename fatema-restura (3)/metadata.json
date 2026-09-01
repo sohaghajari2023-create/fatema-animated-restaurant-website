@@ -1,0 +1,8 @@
+{
+  "name": "Fatema Restura",
+  "description": "A landing page for Fatema Restura, a Bengali restaurant, featuring a dark theme and gold accents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
