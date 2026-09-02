@@ -1,8 +1,9 @@
 [build]
-  publish = "."
-  command = ""
+  base    = "fatema-restura (3)"
+  command = "npm install && npm run build"
+  publish = "fatema-restura (3)/dist"
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000"
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

@@ -1,94 +1,114 @@
 import React, { useEffect, useRef } from 'react';
 
-const frameCount = 239;
-const currentFrame = (index: number) => (
-  `/video_frames_30fps_jpg/frame_${(index + 1).toString().padStart(4, '0')}.jpg`
-);
+const FRAME_COUNT = 239;
+const PRELOAD_BEFORE_START = 15;
+
+const framePath = (i: number) =>
+  `/video_frames_30fps_jpg/frame_${String(i + 1).padStart(4, '0')}.jpg`;
 
 export default function VideoScrollBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const context = canvas.getContext("2d");
-    if (!context) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    const images: HTMLImageElement[] = [];
-    
-    for (let i = 0; i < frameCount; i++) {
-      const img = new Image();
-      img.src = currentFrame(i);
-      images.push(img);
+    const images: HTMLImageElement[] = new Array(FRAME_COUNT);
+    let loadedCount = 0;
+    let started = false;
+    let currentIndex = 0;
+    let ticking = false;
+
+    function setCanvasSize() {
+      const first = images[0];
+      if (first && first.naturalWidth) {
+        canvas!.width = first.naturalWidth;
+        canvas!.height = first.naturalHeight;
+      } else {
+        canvas!.width = window.innerWidth;
+        canvas!.height = window.innerHeight;
+      }
     }
 
-    const render = (index: number) => {
-      if (images[index] && images[index].complete) {
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(images[index], 0, 0, canvas.width, canvas.height);
-      } else if (images[index]) {
-        images[index].onload = () => {
-          context.clearRect(0, 0, canvas.width, canvas.height);
-          context.drawImage(images[index], 0, 0, canvas.width, canvas.height);
+    function drawFrame(index: number) {
+      const img = images[index];
+      if (!img) return;
+      if (img.complete && img.naturalWidth) {
+        ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
+        const scale = Math.max(
+          canvas!.width / img.naturalWidth,
+          canvas!.height / img.naturalHeight
+        );
+        const w = img.naturalWidth * scale;
+        const h = img.naturalHeight * scale;
+        const x = (canvas!.width - w) / 2;
+        const y = (canvas!.height - h) / 2;
+        ctx!.drawImage(img, x, y, w, h);
+      } else {
+        img.onload = () => {
+          if (currentIndex === index) drawFrame(index);
         };
       }
-    };
+    }
 
-    images[0].onload = () => {
-      canvas.width = images[0].naturalWidth;
-      canvas.height = images[0].naturalHeight;
-      // Re-trigger render in case of resize or initial load
-      const handleResize = () => {
-          canvas.width = images[0].naturalWidth;
-          canvas.height = images[0].naturalHeight;
-          const scrollTop = window.scrollY || document.documentElement.scrollTop;
-          const maxScrollTop = document.documentElement.scrollHeight - window.innerHeight;
-          let scrollFraction = maxScrollTop > 0 ? scrollTop / maxScrollTop : 0;
-          const frameIndex = Math.min(frameCount - 1, Math.max(0, Math.floor(scrollFraction * frameCount)));
-          render(frameIndex);
-      };
-      
-      window.addEventListener('resize', handleResize);
-      render(0);
-    };
-
-    let ticking = false;
-    
-    const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          const scrollTop = window.scrollY || document.documentElement.scrollTop;
-          const maxScrollTop = document.documentElement.scrollHeight - window.innerHeight;
-          
-          let scrollFraction = 0;
-          if (maxScrollTop > 0) {
-            scrollFraction = scrollTop / maxScrollTop;
-          }
-          
-          const frameIndex = Math.min(
-            frameCount - 1,
-            Math.max(0, Math.floor(scrollFraction * frameCount))
-          );
-          
-          render(frameIndex);
-          ticking = false;
-        });
-        ticking = true;
+    function onFrameLoaded() {
+      loadedCount++;
+      if (!started && loadedCount >= PRELOAD_BEFORE_START) {
+        started = true;
+        setCanvasSize();
+        drawFrame(0);
       }
-    };
+    }
 
+    // Set onload BEFORE src to avoid race condition on CDN/cached loads
+    for (let i = 0; i < FRAME_COUNT; i++) {
+      const img = new Image();
+      img.onload = onFrameLoaded;
+      img.onerror = onFrameLoaded;
+      img.src = framePath(i);
+      images[i] = img;
+    }
+
+    function handleResize() {
+      setCanvasSize();
+      drawFrame(currentIndex);
+    }
+
+    function handleScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        const fraction = maxScroll > 0 ? scrollTop / maxScroll : 0;
+        currentIndex = Math.min(FRAME_COUNT - 1, Math.max(0, Math.floor(fraction * FRAME_COUNT)));
+        drawFrame(currentIndex);
+        ticking = false;
+      });
+    }
+
+    window.addEventListener('resize', handleResize);
     window.addEventListener('scroll', handleScroll, { passive: true });
+
     return () => {
-        window.removeEventListener('scroll', handleScroll);
-        // Clean up resize listener if we had one (simplified for this context)
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed top-0 left-0 w-screen h-screen object-cover pointer-events-none"
-      style={{ zIndex: -10, imageRendering: 'high-quality' }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: -10,
+      }}
     />
   );
 }
